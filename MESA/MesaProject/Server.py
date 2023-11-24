@@ -54,22 +54,18 @@ def street_portrayal(agent):
     return portrayal
 
 
-canvas_element = mesa.visualization.CanvasGrid(street_portrayal, 24, 24, 600, 600)
-chart_element = mesa.visualization.ChartModule(
-    [
-        {"Label": "Buildings", "Color": "#0390fc"},
-        {"Label": "ParkingSpots", "Color": "#fcf803"},
-    ]
-)
+canvas_element = mesa.visualization.CanvasGrid(street_portrayal, 24, 24, 550, 550)
+
 
 model_params = {
     # The following line is an example to showcase StaticText.
     "title": mesa.visualization.StaticText("- Parameters -"),
     "buildings": mesa.visualization.StaticText("Buildings (Blue)"),
     "parkingSpots": mesa.visualization.StaticText("Parking Spots (Yellow)"),
+    
 }
 
 server = mesa.visualization.ModularServer(
-    StreetView, [canvas_element, chart_element], "Street Mesa Simulation", model_params
+    StreetView, [canvas_element], "Street Mesa Simulation", model_params
 )
 server.port = 8521

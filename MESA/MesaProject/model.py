@@ -13,9 +13,15 @@ class StreetView(mesa.Model):
         height=24,
     ):
         super().__init__()
-        # Iterate through the matrix and print the type of each element
-        def read_matrix(matrix):
-            for y, row in enumerate(matrix):
+        def read_matrix(filename):
+            nmat = []
+            with open(filename, 'r') as file:
+                matrix = [line.strip().split(',') for line in file.readlines()]
+                for row in matrix[::-1]:
+                    nmat.append(row)
+
+            # Iterate through the matrix and print the type of each element
+            for y, row in enumerate(nmat):
                 for x, element in enumerate(row):
                     if element == '-':
                         position = (x,y)
@@ -53,20 +59,7 @@ class StreetView(mesa.Model):
                         # print("Allow all ")
                     else:
                         print(f'Unknown Element: {element}')
-        # Read the file content
-        nmatL = []
-        with open('layout.txt', 'r') as file:
-            matrixL = [line.strip().split(',') for line in file.readlines()]
-            for row in matrixL[::-1]:
-                nmatL.append(row)
-                
-        
-        nmatF = []
-        with open('flow.txt', 'r') as file:
-            matrixF = [line.strip().split(',') for line in file.readlines()]
-            for row in matrixF[::-1]:
-                nmatF.append(row)
-                
+            
 
         # Set parameters
         self.width = width
@@ -77,10 +70,11 @@ class StreetView(mesa.Model):
         self.roundAbout_positions = []
         self.green_positions = []
         self.red_positions = []
-        self.car_positions = [(0,0)]
+        self.car_positions = []
 
-        read_matrix(nmatL)
-        read_matrix(nmatF)
+        # Read the file content
+        read_matrix('layout.txt')
+        read_matrix('flow.txt')
 
         self.schedule = RandomActivationByTypeFiltered(self)
         self.grid = mesa.space.MultiGrid(self.width, self.height, torus=False)
@@ -95,35 +89,35 @@ class StreetView(mesa.Model):
         )
 
         # Create buildings at specified positions
-        for pos in reversed(self.building_positions):
+        for pos in self.building_positions:
             x, y = pos
             building = Buildings(self.next_id(), (x, y), self)
             self.grid.place_agent(building, (x, y))
             self.schedule.add(building)
 
         # Create parking spots at specified positions
-        for pos in reversed(self.parkingSpots_positions):
+        for pos in self.parkingSpots_positions:
             x, y, number = pos
             parkingSpot = ParkingSpots(self.next_id(), (x, y), number, self)
             self.grid.place_agent(parkingSpot, (x, y))
             self.schedule.add(parkingSpot)
 
         # Create round about
-        for pos in reversed(self.roundAbout_positions):
+        for pos in self.roundAbout_positions:
             x, y = pos
             roundAbout = RoundAbout(self.next_id(), (x, y), self)
             self.grid.place_agent(roundAbout, (x, y))
             self.schedule.add(roundAbout)
 
         # Create stop 
-        for pos in reversed(self.red_positions):
+        for pos in self.red_positions:
             x, y = pos
             stop = Stoplight(self.next_id(), (x, y), "red", self)
             self.grid.place_agent(stop, (x, y))
             self.schedule.add(stop)
 
         # Create go
-        for pos in reversed(self.green_positions):
+        for pos in self.green_positions:
             x, y = pos
             go = Stoplight(self.next_id(), (x, y), "green", self)
             self.grid.place_agent(go, (x, y))
@@ -131,13 +125,16 @@ class StreetView(mesa.Model):
 
         # Store available parking spots
         available_spots = list(self.parkingSpots_positions)
-        NUMBER_OF_CARS = 1
+        NUMBER_OF_CARS = 2
+        
+        # Information of cars, initial position and goal
+        self.car_info = {}
 
         # Create cars with random parking spot as initial position and set a different parking spot as the goal
-        for _ in range(NUMBER_OF_CARS):  # Replace NUMBER_OF_CARS with your desired number of cars
+        for i in range(NUMBER_OF_CARS):  # Replace NUMBER_OF_CARS with your desired number of cars
             # Get a random parking spot as the initial position for the car
             initial_spot = random.choice(available_spots)
-            x, y, number = initial_spot
+            x, y, number1 = initial_spot
             car = Car(self.next_id(), (x, y), self)
 
             # Remove the selected initial spot from available spots
@@ -145,7 +142,11 @@ class StreetView(mesa.Model):
 
             # Get a different random parking spot as the goal for the car
             goal_spot = random.choice(available_spots)
+            _, _, number2 = goal_spot
             car.goal_position = (goal_spot[0], goal_spot[1])
+
+            # Add to car_info
+            self.car_info[f'car_{i + 1}'] = {"initial_spot": number1, "goal_position": number2}
 
             self.grid.place_agent(car, (x, y))
             self.schedule.add(car)
@@ -156,6 +157,8 @@ class StreetView(mesa.Model):
         self.running = True
         self.datacollector.collect(self)
         
+        print(self.car_info)
+    
     def step(self):
         self.schedule.step()  # Call the step method for all agents
         self.datacollector.collect(self)  # Collect data for visualization
