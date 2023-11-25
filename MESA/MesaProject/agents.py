@@ -100,10 +100,13 @@ class Car(mesa.Agent):
         
         this_cell =self.model.grid.get_cell_list_contents(pos)
 
+        # TODO: Where it can traverse which direction Moore yMilly neighbore
+        # Moore = False
         for a in this_cell:
             # Check if it is occupied by another car.
             if isinstance(a, Car) or isinstance(a, Buildings) or isinstance(a, RoundAbout):
                 return False
+        
             elif isinstance(a, Stoplight): # if it's Stoplight 
                 if a.color == "green" or a.color == "yellow": 
                     return True 
@@ -126,7 +129,8 @@ class Car(mesa.Agent):
         # Check if the car has a path to follow
         if self.path:
             next_pos = self.path[0]
-            if self.model.grid.is_cell_empty(next_pos) or self.can_move_to_cell(next_pos):
+            print(next_pos)
+            if self.can_move_to_cell(next_pos):
                 self.model.grid.move_agent(self, next_pos)
                 self.path.pop(0) 
             else:
@@ -152,56 +156,58 @@ class Car(mesa.Agent):
         """
         Search the node that has the lowest combined cost and heuristic first.
         """
-        
+
         # Get the start state from the problem
         start_node = initial
-    
+
         # Check if the start state is already the goal state
         if initial == goal:
             return []  # Return an empty list if the start state is the goal state
-    
+
         # Initialize a list to keep track of visited nodes
         visited_nodes = []
-    
+
         # Initialize a priority queue to explore nodes based on combined cost and heuristic
         priority_queue = util.PriorityQueue()
         priority_queue.push((start_node, [], 0), 0)  # Push the start node with zero cost initially
-    
+
         while not priority_queue.isEmpty():
             # Get the current node, its associated actions, and the previous cost from the priority queue
             current_node, actions, prev_cost = priority_queue.pop()
-    
+
             # If the current node has not been visited yet
             if current_node not in visited_nodes:
                 # Mark the current node as visited
                 visited_nodes.append(current_node)
-    
+
                 # Check if the current node is the goal state
                 if current_node == goal:
                     return actions  # Return the list of actions if the goal state is reached
-    
+
                 # Explore the neighbors of the current node
                 for dx in [-1, 0, 1]:
                     for dy in [-1, 0, 1]:
                         if dx == 0 and dy == 0:
                             continue  # Skip the current position
-                        
+
                         # Determine the next node coordinates
                         next_x, next_y = current_node[0] + dx, current_node[1] + dy
                         next_pos = (next_x, next_y)
-    
-                        # Calculate the new cost to reach the next node
-                        new_cost_to_node = prev_cost + 1  # Assuming uniform cost
-    
-                        # Check if the next position is valid to move to
-                        if self.can_move_to_cell(next_pos):
-                            # Calculate the heuristic cost from the next node to the goal
-                            heuristic_cost = new_cost_to_node + self.heuristic_cost_estimate(next_pos, goal)
-    
-                            # Create new actions by appending the current action
-                            new_actions = actions + [(next_x, next_y)]
-    
-                            # Calculate the combined cost and heuristic and add it to the priority queue
-                            priority_queue.push((next_pos, new_actions, new_cost_to_node), heuristic_cost)
-    
+
+                        # Check if the next position is within the bounds of the grid
+                        if next_x >= 0 and next_x < self.model.grid.width and next_y >= 0 and next_y < self.model.grid.height:
+                            # Calculate the new cost to reach the next node
+                            new_cost_to_node = prev_cost + 1  # Assuming uniform cost
+
+                            # Check if the next position is valid to move to
+                            if self.can_move_to_cell(next_pos):
+                                # Calculate the heuristic cost from the next node to the goal
+                                heuristic_cost = new_cost_to_node + self.heuristic_cost_estimate(next_pos, goal)
+
+                                # Create new actions by appending the current action
+                                new_actions = actions + [(next_x, next_y)]
+
+                                # Calculate the combined cost and heuristic and add it to the priority queue
+                                priority_queue.push((next_pos, new_actions, new_cost_to_node), heuristic_cost)
+
         return []  # Return an empty list if the goal state is not reachable

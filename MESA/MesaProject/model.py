@@ -134,7 +134,7 @@ class StreetView(mesa.Model):
 
         # Store available parking spots
         available_spots = list(self.parkingSpots_positions)
-        NUMBER_OF_CARS = 2
+        NUMBER_OF_CARS = 8
         
         # Information of cars, initial position and goal
         self.car_info = {}
