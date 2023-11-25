@@ -3,6 +3,7 @@ import random
 from agents import *
 from scheduler import RandomActivationByTypeFiltered
 
+# TODO: 4 files NSEW ; 0 = Cannot move, 1 = can move
 class StreetView(mesa.Model):
 
     description = "MESA Visualization of the street cross simulation."
@@ -39,34 +40,33 @@ class StreetView(mesa.Model):
                         self.roundAbout_positions.append(position)
                     elif element.isdigit():
                         position = (x,y,element)
-                        # print('Parking Lot ' + element)
                         self.parkingSpots_positions.append(position)
-                    elif element == 'W':
-                        position = (x,y,element)
-                        self.road_positions.append(position)
-                        # print("Disallow going E")
-                    elif element == 'E':
-                        position = (x,y,element)
-                        self.road_positions.append(position)
-                        #print("Disallow going W")
                     elif element == 'N':
                         position = (x,y,element)
-                        self.road_positions.append(position)
-                        #print("Disallow going S")
+                        self.road_N.append(position)
                     elif element == 'S':
                         position = (x,y,element)
-                        self.road_positions.append(position)
-                        # print("Disallow going N")
+                        self.road_S.append(position)
+                    elif element == 'E':
+                        position = (x,y,element)
+                        self.road_E.append(position)
+                    elif element == 'W':
+                        position = (x,y,element)
+                        self.road_W.append(position)
+                        
                     elif element == 'x':
                         pass
-                        # print("Allow all ")
                     else:
                         print(f'Unknown Element: {element}')
 
         # Set parameters
         self.width = width
         self.height = height
-        self.road_positions = []
+        self.road_N = []
+        self.road_S = []
+        self.road_E = []
+        self.road_W = []
+        self.road = [self.road_N, self.road_S, self.road_E, self.road_W]
         self.building_positions = []
         self.parkingSpots_positions = []
         self.roundAbout_positions = []
@@ -76,7 +76,10 @@ class StreetView(mesa.Model):
 
         # Read the file content
         read_matrix('layout.txt')
-        read_matrix('flow.txt')
+        read_matrix('flowN.txt')
+        read_matrix('flowS.txt')
+        read_matrix('flowE.txt')
+        read_matrix('flowW.txt')
 
         self.schedule = RandomActivationByTypeFiltered(self)
         self.grid = mesa.space.MultiGrid(self.width, self.height, torus=False)
@@ -90,12 +93,23 @@ class StreetView(mesa.Model):
             }
         )
 
-        # Create buildings at specified positions
-        for pos in self.road_positions:
-            x, y, direction = pos
-            road = Road(self.next_id(), (x, y), self, direction)
-            self.grid.place_agent(road, (x, y))
-            self.schedule.add(road)
+        # Create roads at specified positions
+        
+        for compass_rose in self.road: 
+            for pos in compass_rose:
+                
+                x, y, direction = pos
+                this_cell =self.grid.get_cell_list_contents((x,y))
+                
+                if self.grid.is_cell_empty((x,y)):
+                    road = Road(self.next_id(), (x, y), self, direction)
+                    self.grid.place_agent(road, (x, y))
+                    self.schedule.add(road)
+
+                for a in this_cell:
+                    if isinstance(a, Road):
+                        a.add_direction(direction)
+                        print((x,y),a.directions)
 
         # Create buildings at specified positions
         for pos in self.building_positions:

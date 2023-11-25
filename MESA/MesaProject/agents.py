@@ -8,10 +8,14 @@ class Road(mesa.Agent):
     """
     A Road Agent. Only traversable in a given trajectory.
     """
-    def __init__(self, unique_id, pos, model, main_direction):
+    def __init__(self, unique_id, pos, model, initial_direction):
         super().__init__(unique_id, model)
         self.pos = pos
-        self.main_direction = main_direction
+        self.directions = []
+        self.directions.append(initial_direction)
+        
+    def add_direction(self, direction):
+        self.directions.append(direction)
 
 
 class Buildings(mesa.Agent):
@@ -89,7 +93,6 @@ class Car(mesa.Agent):
         self.moore = False # Moore neighborhood
         self.vision = 5
 
-
     def can_move_to_cell(self, pos):
         """
         Helper function, indicates if the car is allowed to move to cell.
@@ -100,8 +103,7 @@ class Car(mesa.Agent):
         
         this_cell =self.model.grid.get_cell_list_contents(pos)
 
-        # TODO: Where it can traverse which direction Moore yMilly neighbore
-        # Moore = False
+        # TODO: Where it can traverse which direction Moore n Milly neighbore; Moore = False
         for a in this_cell:
             # Check if it is occupied by another car.
             if isinstance(a, Car) or isinstance(a, Buildings) or isinstance(a, RoundAbout):
@@ -114,6 +116,40 @@ class Car(mesa.Agent):
                     return False
             else: # If its road
                 return True
+
+    # TODO: Complete function
+    def direction_is_available(self, curr, next_pos):
+        """
+        Helper function to check if direction to move is available
+        """
+
+        this_cell =self.model.grid.get_cell_list_contents(curr)
+        available_directions = []
+        for a in this_cell:
+            # Check if it is occupied by another car.
+            if isinstance(a, Road):
+                available_directions = a.directions
+            
+        next_direct = ""
+        if curr == next_pos:
+            return True
+        # y_curr < y_next => N
+        if curr[1] < next_pos[1] and curr[0] == next_pos[0]:
+            next_direct = "N"
+        # y_curr > y_next => S
+        elif curr[1] > next_pos[1] and curr[0] == next_pos[0]:
+            next_direct = "S"
+        # x_curr < x_next => E
+        elif curr[0] < next_pos[0] and curr[1] == next_pos[1]:
+            next_direct = "E"
+        # x_curr > x_next => W
+        elif curr[0] > next_pos[0] and curr[1] == next_pos[1]:
+            next_direct = "W"
+
+        if next_direct in available_directions and self.can_move_to_cell(next_pos):
+            return True
+        
+        return False
 
     def step(self):
         """
@@ -130,7 +166,7 @@ class Car(mesa.Agent):
         if self.path:
             next_pos = self.path[0]
             print(next_pos)
-            if self.can_move_to_cell(next_pos):
+            if self.direction_is_available(self.pos,next_pos):
                 self.model.grid.move_agent(self, next_pos)
                 self.path.pop(0) 
             else:
@@ -200,7 +236,7 @@ class Car(mesa.Agent):
                             new_cost_to_node = prev_cost + 1  # Assuming uniform cost
 
                             # Check if the next position is valid to move to
-                            if self.can_move_to_cell(next_pos):
+                            if self.direction_is_available(current_node,next_pos):
                                 # Calculate the heuristic cost from the next node to the goal
                                 heuristic_cost = new_cost_to_node + self.heuristic_cost_estimate(next_pos, goal)
 
