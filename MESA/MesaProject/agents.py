@@ -1,6 +1,7 @@
 import mesa
 import numpy as np
 import math
+import random
 import heapq
 import util
 
@@ -92,7 +93,6 @@ class Car(mesa.Agent):
         self.goal_position = None  # Store the goal position for the car
         self.moore = False # Moore neighborhood
         self.vision = 5
-        # TODO: HINT
         self.running = True
 
     def can_move_to_cell(self, pos):
@@ -116,8 +116,11 @@ class Car(mesa.Agent):
             elif isinstance(a, Stoplight): # if it's Stoplight 
                 if a.color == "green" or a.color == "yellow": 
                     can_move =True 
+                    self.running = True
                 else: # If it's red
                     can_move = False
+                    self.running = False
+                    return can_move
             else: # If its road
                 can_move = True
         
@@ -130,7 +133,6 @@ class Car(mesa.Agent):
         Helper function to check if direction to move is available.
         Input: curr = (x,y); next_pos = (x,y);
         """
-
         this_cell =self.model.grid.get_cell_list_contents(curr)
         available_directions = []
         for a in this_cell:
@@ -158,100 +160,103 @@ class Car(mesa.Agent):
             return True
         
         return False
-
+    
+    def continue_path(self, position):    
+        """
+        Helper function that follows the path if there is no AStar path 
+        """
+        for next_pos in self.model.grid.get_neighborhood(position, moore=self.moore, include_center=False):
+            # Check if the next position is valid to move to
+            if self.direction_is_available(self.pos,next_pos) and self.can_move_to_cell(next_pos):
+                self.model.grid.move_agent(self, next_pos)
+                self.path = self.aStarSearch(next_pos, self.goal_position)
+        
     def step(self):
         """
-        1. Identify neighbors
+        Called every step.
+        1. Identify position
         2. Determine best path according to a global goal
         3. Find local best path
         4. Move to the next location
         """
+        if self.pos == self.initial_pos:
+            self.continue_path(self.pos)
+        # Check if car is in goal
+        if self.pos == self.goal_position:
+            print(f"Car {self.unique_id} arrived to destination {self.goal_position}, {self.pos}")
+
         if not self.path and self.goal_position:
             self.path = self.aStarSearch(self.pos, self.goal_position)
-            print(self.path)
 
         # Check if the car has a path to follow
         if self.path:
             next_pos = self.path[0]
-            print(next_pos)
-            if self.direction_is_available(self.pos,next_pos):
+            print("MOVE PLAN:",self.pos, next_pos)
+            if self.can_move_to_cell(next_pos) and self.direction_is_available(self.pos,next_pos):
                 self.model.grid.move_agent(self, next_pos)
-                self.path.pop(0) 
+                self.path.pop(0)  
             else:
-                self.path = self.aStarSearch(self.pos, self.goal_position)
+                self.path = self.aStarSearch(next_pos, self.goal_position)
+        else:
+            print(f"No path at {self.pos}")
+            if self.running == True:
+                for next_pos in self.model.grid.get_neighborhood(self.pos, moore=self.moore, include_center=False):
+                    # Check if the next position is valid to move to
+                    if self.direction_is_available(self.pos,next_pos) and self.can_move_to_cell(next_pos):
+                        self.path = self.aStarSearch(next_pos, self.goal_position)
+                        self.continue_path(self.pos)
+            
 
-    
-    def heuristic_cost_estimate(self, current, goal):
+    def heuristic(self, current, goal):
         """
-        Calculate the heuristic cost estimate between current and goal positions.
-        Uses the Euclidean distance as the base heuristic, considering if the cell can be moved to.
+        Calculate the Euclidean distance heuristic with a tie-breaking rule.
         """
+        # Check if the cell can be moved to; if not, increase heuristic value significantly
+        if not self.can_move_to_cell(current):
+            heuristic = math.inf  # Increase heuristic significantly if the cell cannot be moved to
+            return heuristic
+            
         # Euclidean distance as base heuristic
         heuristic = math.sqrt((goal[0] - current[0]) ** 2 + (goal[1] - current[1]) ** 2)
 
-        # Check if the cell can be moved to; if not, increase heuristic value significantly
-        if not self.can_move_to_cell(current):
-            heuristic += 1000  # Increase heuristic significantly if the cell cannot be moved to
-        
         return heuristic
     
-
-    def aStarSearch(self, initial, goal):
+    def reconstruct_path(self, came_from, current):
         """
-        Search the node that has the lowest combined cost and heuristic first.
+        Reconstructs the path from start to goal using the 'came_from' dictionary.
         """
+        total_path = [current]
+        while current in came_from:
+            current = came_from[current]
+            total_path.append(current)
+        return total_path[::-1]
 
-        # Get the start state from the problem
-        start_node = initial
 
-        # Check if the start state is already the goal state
-        if initial == goal:
-            return []  # Return an empty list if the start state is the goal state
+    def aStarSearch(self, start, goal):
+        """
+        A* search algorithm to find the shortest path from 'start' to 'goal'.
+        """
+        frontier = util.PriorityQueue()
+        frontier.push(start, 0)
+        came_from = {}
+        cost_so_far = {start: 0}
 
-        # Initialize a list to keep track of visited nodes
-        visited_nodes = []
+        while not frontier.isEmpty():
+            current = frontier.pop()
 
-        # Initialize a priority queue to explore nodes based on combined cost and heuristic
-        priority_queue = util.PriorityQueue()
-        priority_queue.push((start_node, [], 0), 0)  # Push the start node with zero cost initially
+            if current == goal:
+                A = self.reconstruct_path(came_from, goal)
+                print(A)
+                return A
 
-        while not priority_queue.isEmpty():
-            # Get the current node, its associated actions, and the previous cost from the priority queue
-            current_node, actions, prev_cost = priority_queue.pop()
+            for next_pos in self.model.grid.get_neighborhood(current, moore=self.moore, include_center=False):
+                # Check if the next position is valid to move to
+                if self.direction_is_available(current,next_pos):
+                    new_cost = cost_so_far[current] + self.heuristic(current, next_pos)
+                    if next_pos not in cost_so_far or new_cost < cost_so_far[next_pos]:
+                        cost_so_far[next_pos] = new_cost
+                        priority = new_cost + self.heuristic(next_pos, goal)
+                        frontier.push(next_pos, priority)
+                        came_from[next_pos] = current
 
-            # If the current node has not been visited yet
-            if current_node not in visited_nodes:
-                # Mark the current node as visited
-                visited_nodes.append(current_node)
-
-                # Check if the current node is the goal state
-                if current_node == goal:
-                    return actions  # Return the list of actions if the goal state is reached
-
-                # Explore the neighbors of the current node
-                for dx in [-1, 0, 1]:
-                    for dy in [-1, 0, 1]:
-                        if dx == 0 and dy == 0:
-                            continue  # Skip the current position
-
-                        # Determine the next node coordinates
-                        next_x, next_y = current_node[0] + dx, current_node[1] + dy
-                        next_pos = (next_x, next_y)
-
-                        # Check if the next position is within the bounds of the grid
-                        if next_x >= 0 and next_x < self.model.grid.width and next_y >= 0 and next_y < self.model.grid.height:
-                            # Calculate the new cost to reach the next node
-                            new_cost_to_node = prev_cost + 1  # Assuming uniform cost
-
-                            # Check if the next position is valid to move to
-                            if self.can_move_to_cell(next_pos) and self.direction_is_available(current_node,next_pos):
-                                # Calculate the heuristic cost from the next node to the goal
-                                heuristic_cost = new_cost_to_node + self.heuristic_cost_estimate(next_pos, goal)
-
-                                # Create new actions by appending the current action
-                                new_actions = actions + [(next_x, next_y)]
-
-                                # Calculate the combined cost and heuristic and add it to the priority queue
-                                priority_queue.push((next_pos, new_actions, new_cost_to_node), heuristic_cost)
-
-        return []  # Return an empty list if the goal state is not reachable
+        return []  # If no path found

@@ -109,7 +109,7 @@ class StreetView(mesa.Model):
                 for a in this_cell:
                     if isinstance(a, Road):
                         a.add_direction(direction)
-                        print((x,y),a.directions)
+                        
 
         # Create buildings at specified positions
         for pos in self.building_positions:
@@ -148,7 +148,7 @@ class StreetView(mesa.Model):
 
         # Store available parking spots
         available_spots = list(self.parkingSpots_positions)
-        NUMBER_OF_CARS = 6
+        NUMBER_OF_CARS = 3
         
         # Information of cars, initial position and goal
         self.car_info = {}
@@ -165,11 +165,11 @@ class StreetView(mesa.Model):
 
             # Get a different random parking spot as the goal for the car
             goal_spot = random.choice(available_spots)
-            _, _, number2 = goal_spot
+            x2, y2, number2 = goal_spot
             car.goal_position = (goal_spot[0], goal_spot[1])
 
             # Add to car_info
-            self.car_info[f'car_{i + 1}'] = {"initial_spot": number1, "goal_position": number2}
+            self.car_info[f'car_{i + 1}'] = {"initial_spot": (x,y), "goal_position": (x2,y2)}
 
             self.grid.place_agent(car, (x, y))
             self.schedule.add(car)
