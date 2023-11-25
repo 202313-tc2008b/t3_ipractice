@@ -92,12 +92,15 @@ class Car(mesa.Agent):
         self.goal_position = None  # Store the goal position for the car
         self.moore = False # Moore neighborhood
         self.vision = 5
+        # TODO: HINT
+        self.running = True
 
     def can_move_to_cell(self, pos):
         """
         Helper function, indicates if the car is allowed to move to cell.
         Takes a pos argument, a tuple of (x,y).
         """
+        can_move = False
         if pos == self.pos:
             return True
         
@@ -107,26 +110,31 @@ class Car(mesa.Agent):
         for a in this_cell:
             # Check if it is occupied by another car.
             if isinstance(a, Car) or isinstance(a, Buildings) or isinstance(a, RoundAbout):
-                return False
+                can_move = False
+                return can_move 
         
             elif isinstance(a, Stoplight): # if it's Stoplight 
                 if a.color == "green" or a.color == "yellow": 
-                    return True 
+                    can_move =True 
                 else: # If it's red
-                    return False
+                    can_move = False
             else: # If its road
-                return True
+                can_move = True
+        
+        return can_move
 
-    # TODO: Complete function
+    # TODO: Make them de-spawn when entering a parking spot
+    # TODO: Make the cars go out of parking spots first
     def direction_is_available(self, curr, next_pos):
         """
-        Helper function to check if direction to move is available
+        Helper function to check if direction to move is available.
+        Input: curr = (x,y); next_pos = (x,y);
         """
 
         this_cell =self.model.grid.get_cell_list_contents(curr)
         available_directions = []
         for a in this_cell:
-            # Check if it is occupied by another car.
+            # Check if it is a Road.
             if isinstance(a, Road):
                 available_directions = a.directions
             
@@ -146,7 +154,7 @@ class Car(mesa.Agent):
         elif curr[0] > next_pos[0] and curr[1] == next_pos[1]:
             next_direct = "W"
 
-        if next_direct in available_directions and self.can_move_to_cell(next_pos):
+        if next_direct in available_directions:
             return True
         
         return False
@@ -236,7 +244,7 @@ class Car(mesa.Agent):
                             new_cost_to_node = prev_cost + 1  # Assuming uniform cost
 
                             # Check if the next position is valid to move to
-                            if self.direction_is_available(current_node,next_pos):
+                            if self.can_move_to_cell(next_pos) and self.direction_is_available(current_node,next_pos):
                                 # Calculate the heuristic cost from the next node to the goal
                                 heuristic_cost = new_cost_to_node + self.heuristic_cost_estimate(next_pos, goal)
 
