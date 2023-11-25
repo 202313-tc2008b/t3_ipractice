@@ -24,8 +24,7 @@ class StreetView(mesa.Model):
             for y, row in enumerate(nmat):
                 for x, element in enumerate(row):
                     if element == '-':
-                        position = (x,y)
-                        self.road_positions.append(position)
+                        continue
                     elif element == 'G':
                         position = (x,y)
                         self.green_positions.append(position)
@@ -43,23 +42,26 @@ class StreetView(mesa.Model):
                         # print('Parking Lot ' + element)
                         self.parkingSpots_positions.append(position)
                     elif element == 'W':
-                        pass
+                        position = (x,y,element)
+                        self.road_positions.append(position)
                         # print("Disallow going E")
                     elif element == 'E':
-                        pass
+                        position = (x,y,element)
+                        self.road_positions.append(position)
                         #print("Disallow going W")
                     elif element == 'N':
-                        pass
+                        position = (x,y,element)
+                        self.road_positions.append(position)
                         #print("Disallow going S")
                     elif element == 'S':
-                        pass
+                        position = (x,y,element)
+                        self.road_positions.append(position)
                         # print("Disallow going N")
                     elif element == 'x':
                         pass
                         # print("Allow all ")
                     else:
                         print(f'Unknown Element: {element}')
-            
 
         # Set parameters
         self.width = width
@@ -87,6 +89,13 @@ class StreetView(mesa.Model):
                 "Cars": lambda c: c.schedule.get_type_count(Car),
             }
         )
+
+        # Create buildings at specified positions
+        for pos in self.road_positions:
+            x, y, direction = pos
+            road = Road(self.next_id(), (x, y), self, direction)
+            self.grid.place_agent(road, (x, y))
+            self.schedule.add(road)
 
         # Create buildings at specified positions
         for pos in self.building_positions:
