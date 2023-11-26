@@ -53,10 +53,12 @@ def street_portrayal(agent):
 
     if type(agent) is Car:
         portrayal["Color"] = ["#000", "#000", "#000"]
-        portrayal["Shape"] = "circle"
+        portrayal["Shape"] = "arrowHead"
         portrayal["Filled"] = "true"
         portrayal["Layer"] = 0
-        portrayal["r"] = 1
+        portrayal["scale"] = 0.7
+        portrayal["heading_x"] = agent.current_direction[0]
+        portrayal["heading_y"] = agent.current_direction[1]
 
     return portrayal
 

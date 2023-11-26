@@ -3,7 +3,6 @@ import random
 from agents import *
 from scheduler import RandomActivationByTypeFiltered
 
-# TODO: 4 files NSEW ; 0 = Cannot move, 1 = can move
 class StreetView(mesa.Model):
 
     description = "MESA Visualization of the street cross simulation."
@@ -24,7 +23,7 @@ class StreetView(mesa.Model):
             # Iterate through the matrix and print the type of each element
             for y, row in enumerate(nmat):
                 for x, element in enumerate(row):
-                    if element == '-':
+                    if element == '-' or element == "":
                         continue
                     elif element == 'G':
                         position = (x,y)
@@ -57,21 +56,84 @@ class StreetView(mesa.Model):
                     elif element == 'x':
                         pass
                     else:
-                        print(f'Unknown Element: {element}')
+                        continue
+        
+        
+        def make_flow(filename):
+            nmat = []
+            with open(filename, 'r') as file:
+                matrix = [line.strip().split(',') for line in file.readlines()]
+                for row in matrix[::-1]:
+                    nmat.append(row)
 
+            # Iterate through the matrix and print the type of each element
+            for y, row in enumerate(nmat):
+                for x, element in enumerate(row):
+                    if element == '-' or element == "":
+                        continue
+                    elif element == 'N':
+                        position = (x,y,element)
+                        self.flow.append(position)
+                    elif element == 'S':
+                        position = (x,y,element)
+                        self.flow.append(position)
+                    elif element == 'E':
+                        position = (x,y,element)
+                        self.flow.append(position)
+                    elif element == 'W':
+                        position = (x,y,element)
+                        self.flow.append(position)
+                        
+
+        def make_cars(cars_num):
+            # Store available parking spots
+            available_spots = list(self.parkingSpots_positions)
+            # Create cars with random parking spot as initial position and set a different parking spot as the goal
+            for i in range(cars_num):  # Replace NUMBER_OF_CARS with your desired number of cars
+                # Get a random parking spot as the initial position for the car
+                initial_spot = random.choice(available_spots)
+                x, y, spot_num1 = initial_spot
+                car = Car(self.next_id(), (x, y), self)
+    
+                # Remove the selected initial spot from available spots
+                available_spots.remove(initial_spot)
+    
+                # Get a different random parking spot as the goal for the car
+                goal_spot = random.choice(available_spots)
+                x2, y2, spot_num2 = goal_spot
+                car.goal_position = (goal_spot[0], goal_spot[1])
+    
+                # Add to car_info
+                self.car_info[f"{car.unique_id}"] = {"initial_spot": (x,y),
+                                                   "initial_spot":spot_num1,
+                                                   "goal_spot":spot_num2,"goal_position": (x2,y2),
+                                                   "current_direction":{car.current_direction}}
+    
+                self.grid.place_agent(car, (x, y))
+                self.schedule.add(car)
+    
+                # Remove the selected goal spot from available spots to avoid same initial and goal spots
+                available_spots.remove(goal_spot)
         # Set parameters
         self.width = width
         self.height = height
+        # Main flow of the roads
+        self.flow = []
+        # Available choices for the cars to move
         self.road_N = []
         self.road_S = []
         self.road_E = []
         self.road_W = []
+        # For iteration over all road elements
         self.road = [self.road_N, self.road_S, self.road_E, self.road_W]
+        # Other agents
         self.building_positions = []
-        self.parkingSpots_positions = []
         self.roundAbout_positions = []
+        self.parkingSpots_positions = []
+        # Stoplights
         self.green_positions = []
         self.red_positions = []
+        # Cars
         self.car_positions = []
 
         # Read the file content
@@ -80,6 +142,7 @@ class StreetView(mesa.Model):
         read_matrix('flowS.txt')
         read_matrix('flowE.txt')
         read_matrix('flowW.txt')
+        make_flow('mainFlow.txt')
 
         self.schedule = RandomActivationByTypeFiltered(self)
         self.grid = mesa.space.MultiGrid(self.width, self.height, torus=False)
@@ -94,10 +157,8 @@ class StreetView(mesa.Model):
         )
 
         # Create roads at specified positions
-        
         for compass_rose in self.road: 
             for pos in compass_rose:
-                
                 x, y, direction = pos
                 this_cell =self.grid.get_cell_list_contents((x,y))
                 
@@ -109,7 +170,15 @@ class StreetView(mesa.Model):
                 for a in this_cell:
                     if isinstance(a, Road):
                         a.add_direction(direction)
-                        
+        
+        # Set the main directions for the roads
+        for pos in self.flow:
+            x, y, direction = pos
+            this_cell =self.grid.get_cell_list_contents((x,y))
+            
+            for a in this_cell:
+                if isinstance(a, Road):
+                    a.set_main_direction(direction)
 
         # Create buildings at specified positions
         for pos in self.building_positions:
@@ -146,42 +215,29 @@ class StreetView(mesa.Model):
             self.grid.place_agent(go, (x, y))
             self.schedule.add(go)
 
-        # Store available parking spots
-        available_spots = list(self.parkingSpots_positions)
+        
         NUMBER_OF_CARS = 3
         
         # Information of cars, initial position and goal
         self.car_info = {}
 
-        # Create cars with random parking spot as initial position and set a different parking spot as the goal
-        for i in range(NUMBER_OF_CARS):  # Replace NUMBER_OF_CARS with your desired number of cars
-            # Get a random parking spot as the initial position for the car
-            initial_spot = random.choice(available_spots)
-            x, y, number1 = initial_spot
-            car = Car(self.next_id(), (x, y), self)
-
-            # Remove the selected initial spot from available spots
-            available_spots.remove(initial_spot)
-
-            # Get a different random parking spot as the goal for the car
-            goal_spot = random.choice(available_spots)
-            x2, y2, number2 = goal_spot
-            car.goal_position = (goal_spot[0], goal_spot[1])
-
-            # Add to car_info
-            self.car_info[f'car_{i + 1}'] = {"initial_spot": (x,y), "goal_position": (x2,y2)}
-
-            self.grid.place_agent(car, (x, y))
-            self.schedule.add(car)
-
-            # Remove the selected goal spot from available spots to avoid same initial and goal spots
-            available_spots.remove(goal_spot)
+        make_cars(NUMBER_OF_CARS)        
 
         self.running = True
         self.datacollector.collect(self)
         
         print(self.car_info)
     
+
+    def get_info(self):
+        """
+        Method that retrieves the information of a step, for JSON output (MESA>>Flask>>Unity)
+        """
+        car = [{"car_id":1}]
+        return car
+
+
     def step(self):
+        
         self.schedule.step()  # Call the step method for all agents
         self.datacollector.collect(self)  # Collect data for visualization

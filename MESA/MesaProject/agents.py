@@ -14,9 +14,13 @@ class Road(mesa.Agent):
         self.pos = pos
         self.directions = []
         self.directions.append(initial_direction)
+        self.main_direction = initial_direction
         
     def add_direction(self, direction):
         self.directions.append(direction)
+    
+    def set_main_direction(self, direction):
+        self.main_direction = direction
 
 
 class Buildings(mesa.Agent):
@@ -94,6 +98,22 @@ class Car(mesa.Agent):
         self.moore = False # Moore neighborhood
         self.vision = 5
         self.running = True
+        self.current_direction = (0,1)
+
+    def translate_direction(self, direction):
+        """
+        Helper function, transforms the direction it's going to a vector"""
+        match direction:
+            case "N":
+                self.current_direction = (0,1)
+            case "S":
+                self.current_direction = (0,-1)
+            case "E":
+                self.current_direction = (1,0)
+            case "W":
+                self.current_direction = (-1,0)
+            case _:
+                self.current_direction = self.current_direction
 
     def can_move_to_cell(self, pos):
         """
@@ -106,23 +126,22 @@ class Car(mesa.Agent):
         
         this_cell =self.model.grid.get_cell_list_contents(pos)
 
-        # TODO: Where it can traverse which direction Moore n Milly neighbore; Moore = False
         for a in this_cell:
             # Check if it is occupied by another car.
             if isinstance(a, Car) or isinstance(a, Buildings) or isinstance(a, RoundAbout):
                 can_move = False
-                return can_move 
         
             elif isinstance(a, Stoplight): # if it's Stoplight 
                 if a.color == "green" or a.color == "yellow": 
-                    can_move =True 
+                    can_move = True 
                     self.running = True
+                    
                 else: # If it's red
                     can_move = False
                     self.running = False
-                    return can_move
             else: # If its road
                 can_move = True
+                self.running = True
         
         return can_move
 
@@ -165,12 +184,31 @@ class Car(mesa.Agent):
         """
         Helper function that follows the path if there is no AStar path 
         """
-        for next_pos in self.model.grid.get_neighborhood(position, moore=self.moore, include_center=False):
+        this_cell =self.model.grid.get_cell_list_contents(position)
+        
+        for a in this_cell:
+            if isinstance(a, Road):
+                self.translate_direction(a.main_direction)
+                new_direction = (position[0] + self.current_direction[0],
+                                 position[1] + self.current_direction[1]
+                                 )
+                if self.can_move_to_cell(new_direction):
+                    self.move(new_direction)
+
+        """ for next_pos in self.model.grid.get_neighborhood(position, moore=self.moore, include_center=False):
             # Check if the next position is valid to move to
             if self.direction_is_available(self.pos,next_pos) and self.can_move_to_cell(next_pos):
-                self.model.grid.move_agent(self, next_pos)
-                self.path = self.aStarSearch(next_pos, self.goal_position)
-        
+                self.move(next_pos)
+                self.path = self.aStarSearch(next_pos, self.goal_position) """
+    
+    def move(self, pos):
+        # Save the previous position
+        prev = self.pos
+        self.model.grid.move_agent(self, pos)
+        direction = (pos[0]-prev[0],pos[1]-prev[1])
+        if not direction == (0,0):
+            self.current_direction = direction
+
     def step(self):
         """
         Called every step.
@@ -181,31 +219,40 @@ class Car(mesa.Agent):
         """
         if self.pos == self.initial_pos:
             self.continue_path(self.pos)
+            self.path = self.aStarSearch(self.pos,self.goal_position)
         # Check if car is in goal
         if self.pos == self.goal_position:
             print(f"Car {self.unique_id} arrived to destination {self.goal_position}, {self.pos}")
+            
+            # self.model.grid.remove_agent(self)
+            # self.schedule.remove(self)
+            # self.kill_agents.remove(self)
 
+        # If it has not got a path in the position and it still has a goal position
         if not self.path and self.goal_position:
+            print(self.path, self.goal_position)
             self.path = self.aStarSearch(self.pos, self.goal_position)
 
         # Check if the car has a path to follow
         if self.path:
             next_pos = self.path[0]
-            print("MOVE PLAN:",self.pos, next_pos)
             if self.can_move_to_cell(next_pos) and self.direction_is_available(self.pos,next_pos):
-                self.model.grid.move_agent(self, next_pos)
+                self.move(next_pos)
                 self.path.pop(0)  
             else:
+                self.continue_path(self.pos)
                 self.path = self.aStarSearch(next_pos, self.goal_position)
         else:
             print(f"No path at {self.pos}")
+            print(f"Running? : {self.running}")
             if self.running == True:
-                for next_pos in self.model.grid.get_neighborhood(self.pos, moore=self.moore, include_center=False):
-                    # Check if the next position is valid to move to
-                    if self.direction_is_available(self.pos,next_pos) and self.can_move_to_cell(next_pos):
-                        self.path = self.aStarSearch(next_pos, self.goal_position)
-                        self.continue_path(self.pos)
-            
+                self.continue_path(self.pos)
+                self.path = self.aStarSearch(self.pos, self.goal_position)
+
+                        
+    """
+    ############################# ~ ~ ~ SEARCH METHODS ~ ~ ~ #############################
+    """
 
     def heuristic(self, current, goal):
         """
@@ -245,9 +292,7 @@ class Car(mesa.Agent):
             current = frontier.pop()
 
             if current == goal:
-                A = self.reconstruct_path(came_from, goal)
-                print(A)
-                return A
+                return self.reconstruct_path(came_from, goal)
 
             for next_pos in self.model.grid.get_neighborhood(current, moore=self.moore, include_center=False):
                 # Check if the next position is valid to move to
