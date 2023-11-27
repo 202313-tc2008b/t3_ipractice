@@ -4,7 +4,14 @@ from agents import *
 from scheduler import RandomActivationByTypeFiltered
 
 class StreetView(mesa.Model):
+    """Main model: StreetView, controlls agents
 
+    Args:
+        mesa (mesa.Model): Mesa's base model
+
+    Returns:
+        None: No returns
+    """
     description = "MESA Visualization of the street cross simulation."
     
     def __init__(    
@@ -13,6 +20,7 @@ class StreetView(mesa.Model):
         height=24,
     ):
         super().__init__()
+        
         def read_matrix(filename):
             nmat = []
             with open(filename, 'r') as file:
@@ -52,13 +60,10 @@ class StreetView(mesa.Model):
                     elif element == 'W':
                         position = (x,y,element)
                         self.road_W.append(position)
-                        
-                    elif element == 'x':
-                        pass
                     else:
                         continue
         
-        
+
         def make_flow(filename):
             nmat = []
             with open(filename, 'r') as file:
@@ -87,19 +92,19 @@ class StreetView(mesa.Model):
 
         def make_cars(cars_num):
             # Store available parking spots
-            available_spots = list(self.parkingSpots_positions)
+            self.available_spots = list(self.parkingSpots_positions)
             # Create cars with random parking spot as initial position and set a different parking spot as the goal
             for i in range(cars_num):  # Replace NUMBER_OF_CARS with your desired number of cars
                 # Get a random parking spot as the initial position for the car
-                initial_spot = random.choice(available_spots)
+                initial_spot = random.choice(self.available_spots)
                 x, y, spot_num1 = initial_spot
                 car = Car(self.next_id(), (x, y), self)
     
                 # Remove the selected initial spot from available spots
-                available_spots.remove(initial_spot)
+                self.available_spots.remove(initial_spot)
     
                 # Get a different random parking spot as the goal for the car
-                goal_spot = random.choice(available_spots)
+                goal_spot = random.choice(self.available_spots)
                 x2, y2, spot_num2 = goal_spot
                 car.goal_position = (goal_spot[0], goal_spot[1])
     
@@ -113,7 +118,7 @@ class StreetView(mesa.Model):
                 self.schedule.add(car)
     
                 # Remove the selected goal spot from available spots to avoid same initial and goal spots
-                available_spots.remove(goal_spot)
+                self.available_spots.remove(goal_spot)
         # Set parameters
         self.width = width
         self.height = height

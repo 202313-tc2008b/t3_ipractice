@@ -194,6 +194,8 @@ class Car(mesa.Agent):
                                  )
                 if self.can_move_to_cell(new_direction):
                     self.move(new_direction)
+        
+        self.path = self.aStarSearch(self.pos,self.goal_position)
 
         """ for next_pos in self.model.grid.get_neighborhood(position, moore=self.moore, include_center=False):
             # Check if the next position is valid to move to
@@ -219,18 +221,18 @@ class Car(mesa.Agent):
         """
         if self.pos == self.initial_pos:
             self.continue_path(self.pos)
-            self.path = self.aStarSearch(self.pos,self.goal_position)
+            
         # Check if car is in goal
         if self.pos == self.goal_position:
-            print(f"Car {self.unique_id} arrived to destination {self.goal_position}, {self.pos}")
-            
-            # self.model.grid.remove_agent(self)
+            print(f"Car {self.unique_id} arrived to destination {self.goal_position}, {self.pos}")     
+            self.model.available_spots.append(self.initial_pos)
+            self.model.available_spots.append(self.goal_position)
             # self.schedule.remove(self)
             # self.kill_agents.remove(self)
 
         # If it has not got a path in the position and it still has a goal position
         if not self.path and self.goal_position:
-            print(self.path, self.goal_position)
+            print(">>>",self.path)
             self.path = self.aStarSearch(self.pos, self.goal_position)
 
         # Check if the car has a path to follow
@@ -241,13 +243,12 @@ class Car(mesa.Agent):
                 self.path.pop(0)  
             else:
                 self.continue_path(self.pos)
-                self.path = self.aStarSearch(next_pos, self.goal_position)
+                
         else:
             print(f"No path at {self.pos}")
-            print(f"Running? : {self.running}")
             if self.running == True:
                 self.continue_path(self.pos)
-                self.path = self.aStarSearch(self.pos, self.goal_position)
+            
 
                         
     """
