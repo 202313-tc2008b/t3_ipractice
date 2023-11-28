@@ -1,5 +1,6 @@
 import mesa
 import random
+import json
 from agents import *
 from scheduler import RandomActivationByTypeFiltered
 
@@ -20,6 +21,8 @@ class StreetView(mesa.Model):
         height=24,
     ):
         super().__init__()
+        self.active_cars = 0
+        self.max_cars = 15
         
         def read_matrix(filename):
             nmat = []
@@ -89,36 +92,6 @@ class StreetView(mesa.Model):
                         position = (x,y,element)
                         self.flow.append(position)
                         
-
-        def make_cars(cars_num):
-            # Store available parking spots
-            self.available_spots = list(self.parkingSpots_positions)
-            # Create cars with random parking spot as initial position and set a different parking spot as the goal
-            for i in range(cars_num):  # Replace NUMBER_OF_CARS with your desired number of cars
-                # Get a random parking spot as the initial position for the car
-                initial_spot = random.choice(self.available_spots)
-                x, y, spot_num1 = initial_spot
-                car = Car(self.next_id(), (x, y), self)
-    
-                # Remove the selected initial spot from available spots
-                self.available_spots.remove(initial_spot)
-    
-                # Get a different random parking spot as the goal for the car
-                goal_spot = random.choice(self.available_spots)
-                x2, y2, spot_num2 = goal_spot
-                car.goal_position = (goal_spot[0], goal_spot[1])
-    
-                # Add to car_info
-                self.car_info[f"{car.unique_id}"] = {"initial_spot": (x,y),
-                                                   "initial_spot":spot_num1,
-                                                   "goal_spot":spot_num2,"goal_position": (x2,y2),
-                                                   "current_direction":{car.current_direction}}
-    
-                self.grid.place_agent(car, (x, y))
-                self.schedule.add(car)
-    
-                # Remove the selected goal spot from available spots to avoid same initial and goal spots
-                self.available_spots.remove(goal_spot)
         # Set parameters
         self.width = width
         self.height = height
@@ -212,7 +185,8 @@ class StreetView(mesa.Model):
             stop = Stoplight(self.next_id(), (x, y), "red", self)
             self.grid.place_agent(stop, (x, y))
             self.schedule.add(stop)
-
+            
+        
         # Create go
         for pos in self.green_positions:
             x, y = pos
@@ -220,29 +194,79 @@ class StreetView(mesa.Model):
             self.grid.place_agent(go, (x, y))
             self.schedule.add(go)
 
-        
-        NUMBER_OF_CARS = 3
-        
-        # Information of cars, initial position and goal
-        self.car_info = {}
 
-        make_cars(NUMBER_OF_CARS)        
+        
+        NUMBER_OF_CARS = 2
+
+        self.make_cars(NUMBER_OF_CARS)        
 
         self.running = True
         self.datacollector.collect(self)
-        
-        print(self.car_info)
     
+    def make_cars(self, cars_num):
+        # Store available parking spots
+        self.available_spots = list(self.parkingSpots_positions)
+        # Create cars with random parking spot as initial position and set a different parking spot as the goal
+        for i in range(cars_num):  # Replace NUMBER_OF_CARS with your desired number of cars
+            # Get a random parking spot as the initial position for the car
+            initial_spot = random.choice(self.available_spots)
+            x, y, spot_num1 = initial_spot
+            car = Car(self.next_id(), (x, y), self)
+
+            # Remove the selected initial spot from available spots
+            self.available_spots.remove(initial_spot)
+
+            # Get a different random parking spot as the goal for the car
+            goal_spot = random.choice(self.available_spots)
+            x2, y2, spot_num2 = goal_spot
+            car.goal_pos = (goal_spot[0], goal_spot[1])
+            car.set_spots(spot_num1,spot_num2)
+            
+            
+            self.grid.place_agent(car, (x, y))
+            self.schedule.add(car)
+
+            # Remove the selected goal spot from available spots to avoid same initial and goal spots
+            self.available_spots.remove(goal_spot)
+            self.active_cars += 1
+
+
+    def check_available_spots(self):
+        # Check for available spots and spawn cars
+        if self.active_cars < self.max_cars:
+            self.make_cars(1)
+        
 
     def get_info(self):
+        """ 
+        Method that retrieves the information of a step, for JSON output (MESA>>Flask>>Unity) 
         """
-        Method that retrieves the information of a step, for JSON output (MESA>>Flask>>Unity)
-        """
-        car = [{"car_id":1}]
-        return car
+        self.car_info = []
+        self.stoplight_info = []
+        colors = []
+        for a in self.schedule.agents:
+            if isinstance(a, Car):
+                # Add to car_info
+                self.car_info.append({"car_id":a.unique_id, 
+                                      "position": {
+                                          "x":a.pos[0],
+                                          "z":a.pos[1]
+                                      },
+                                   "current_direction":{
+                                       "x":a.current_direction[0],
+                                       "z":a.current_direction[1]
+                                        }
+                                     })
+            elif isinstance(a, Stoplight):
+                if a.color not in colors:
+                    self.stoplight_info.append({"stop_type":a.type,
+                                        "color":a.color})
+                    colors.append(a.color)
 
+        self.info = {"cars":self.car_info, "stoplights": self.stoplight_info}
+        return json.dumps(self.info)
+    
 
     def step(self):
-        
         self.schedule.step()  # Call the step method for all agents
         self.datacollector.collect(self)  # Collect data for visualization

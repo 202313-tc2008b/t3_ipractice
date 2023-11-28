@@ -60,6 +60,12 @@ class Stoplight(mesa.Agent):
         self.pos = pos
         self.color = color
         self.step_counter = 0  # Initialize the step counter
+        self.type = ""
+        if self.color == "green":
+            self.type = "A"
+        elif self.color == "red":
+            self.type = "B"
+        else: self.type = "N/A"
     
     def step(self):
         """
@@ -91,14 +97,21 @@ class Car(mesa.Agent):
     """
     def __init__(self, unique_id, pos, model):
         super().__init__(unique_id, model)
+        self.is_active = True
         self.initial_pos = pos
         self.pos = pos
         self.path = []  # Store the path the car will follow
-        self.goal_position = None  # Store the goal position for the car
+        self.goal_pos = None  # Store the goal position for the car
         self.moore = False # Moore neighborhood
         self.vision = 5
         self.running = True
         self.current_direction = (0,1)
+        self.start_spot = None
+        self.goal_spot = None
+
+    def set_spots(self, spot_num1, spot_num2):
+        self.start_spot = spot_num1
+        self.goal_spot = spot_num2
 
     def translate_direction(self, direction):
         """
@@ -146,7 +159,7 @@ class Car(mesa.Agent):
         return can_move
 
     # TODO: Make them de-spawn when entering a parking spot
-    # TODO: Make the cars go out of parking spots first
+
     def direction_is_available(self, curr, next_pos):
         """
         Helper function to check if direction to move is available.
@@ -195,14 +208,14 @@ class Car(mesa.Agent):
                 if self.can_move_to_cell(new_direction):
                     self.move(new_direction)
         
-        self.path = self.aStarSearch(self.pos,self.goal_position)
+        self.path = self.aStarSearch(self.pos,self.goal_pos)
 
-        """ for next_pos in self.model.grid.get_neighborhood(position, moore=self.moore, include_center=False):
-            # Check if the next position is valid to move to
-            if self.direction_is_available(self.pos,next_pos) and self.can_move_to_cell(next_pos):
-                self.move(next_pos)
-                self.path = self.aStarSearch(next_pos, self.goal_position) """
-    
+    def remove_car(self):
+        print(f"Car {self.unique_id} arrived to destination {self.goal_pos}, {self.pos}")     
+        self.model.available_spots.append((self.initial_pos[0],self.initial_pos[1],self.start_spot))
+        self.model.available_spots.append((self.goal_pos[0],self.goal_pos[1],self.goal_spot))
+        self.is_active = False
+
     def move(self, pos):
         # Save the previous position
         prev = self.pos
@@ -223,17 +236,12 @@ class Car(mesa.Agent):
             self.continue_path(self.pos)
             
         # Check if car is in goal
-        if self.pos == self.goal_position:
-            print(f"Car {self.unique_id} arrived to destination {self.goal_position}, {self.pos}")     
-            self.model.available_spots.append(self.initial_pos)
-            self.model.available_spots.append(self.goal_position)
-            # self.schedule.remove(self)
-            # self.kill_agents.remove(self)
+        if self.pos == self.goal_pos:
+            self.remove_car()
 
         # If it has not got a path in the position and it still has a goal position
-        if not self.path and self.goal_position:
-            print(">>>",self.path)
-            self.path = self.aStarSearch(self.pos, self.goal_position)
+        if not self.path and self.goal_pos:
+            self.path = self.aStarSearch(self.pos, self.goal_pos)
 
         # Check if the car has a path to follow
         if self.path:
@@ -245,12 +253,11 @@ class Car(mesa.Agent):
                 self.continue_path(self.pos)
                 
         else:
-            print(f"No path at {self.pos}")
             if self.running == True:
                 self.continue_path(self.pos)
             
 
-                        
+    
     """
     ############################# ~ ~ ~ SEARCH METHODS ~ ~ ~ #############################
     """
