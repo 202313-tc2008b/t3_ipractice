@@ -211,7 +211,6 @@ class Car(mesa.Agent):
         self.path = self.aStarSearch(self.pos,self.goal_pos)
 
     def remove_car(self):
-        print(f"Car {self.unique_id} arrived to destination {self.goal_pos}, {self.pos}")     
         self.model.available_spots.append((self.initial_pos[0],self.initial_pos[1],self.start_spot))
         self.model.available_spots.append((self.goal_pos[0],self.goal_pos[1],self.goal_spot))
         self.is_active = False

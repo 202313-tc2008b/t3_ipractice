@@ -22,7 +22,8 @@ class StreetView(mesa.Model):
     ):
         super().__init__()
         self.active_cars = 0
-        self.max_cars = 15
+        self.max_cars = 40
+        self.finished_cars = 0
         
         def read_matrix(filename):
             nmat = []
@@ -196,7 +197,7 @@ class StreetView(mesa.Model):
 
 
         
-        NUMBER_OF_CARS = 2
+        NUMBER_OF_CARS = 5
 
         self.make_cars(NUMBER_OF_CARS)        
 
@@ -226,15 +227,19 @@ class StreetView(mesa.Model):
             self.grid.place_agent(car, (x, y))
             self.schedule.add(car)
 
-            # Remove the selected goal spot from available spots to avoid same initial and goal spots
-            self.available_spots.remove(goal_spot)
             self.active_cars += 1
+            self.finished_cars += 1
+
+            self.available_spots.append(initial_spot)
 
 
     def check_available_spots(self):
         # Check for available spots and spawn cars
-        if self.active_cars < self.max_cars:
-            self.make_cars(1)
+        if self.active_cars < self.max_cars and len(self.available_spots) >= 2:
+            if self.finished_cars < 500:
+                self.make_cars(1)
+                print(self.finished_cars)
+        
         
 
     def get_info(self):
@@ -266,7 +271,27 @@ class StreetView(mesa.Model):
         self.info = {"cars":self.car_info, "stoplights": self.stoplight_info}
         return json.dumps(self.info)
     
+    def check_active(self):
+        try:
+            for a in self.schedule.agents:
+                if isinstance(a, Car):
+                    if not a.is_active:
+                        self.grid.remove_agent(a)
+                        self.schedule.remove(a)
+                        self.active_cars -= 1
+                        try: 
+                            del a
+                        except Exception as e:
+                            print(f"An error occurred: {e}")
+
+
+            self.check_available_spots()
+        except Exception as e:  # Catch specific exceptions here or use Exception for a general catch
+            print(f"An error occurred: {e}")
+            
 
     def step(self):
-        self.schedule.step()  # Call the step method for all agents
+        self.schedule.step_type(Car)  # Call the step method for all agents
+        self.schedule.step_type(Stoplight)  # Call the step method for all agents
+        self.check_active()
         self.datacollector.collect(self)  # Collect data for visualization
