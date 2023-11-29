@@ -97,21 +97,23 @@ class Car(mesa.Agent):
     """
     def __init__(self, unique_id, pos, model):
         super().__init__(unique_id, model)
+
         self.is_active = True
         self.initial_pos = pos
         self.pos = pos
         self.path = []  # Store the path the car will follow
         self.goal_pos = None  # Store the goal position for the car
         self.moore = False # Moore neighborhood
-        self.vision = 5
         self.running = True
         self.current_direction = (0,1)
+
+        this_cell =self.model.grid.get_cell_list_contents(self.pos)
+        for a in this_cell:
+            if isinstance(a,Road):   
+                self.translate_direction(a.main_direction)
+        
         self.start_spot = None
         self.goal_spot = None
-
-    def set_spots(self, spot_num1, spot_num2):
-        self.start_spot = spot_num1
-        self.goal_spot = spot_num2
 
     def translate_direction(self, direction):
         """
@@ -127,6 +129,11 @@ class Car(mesa.Agent):
                 self.current_direction = (-1,0)
             case _:
                 self.current_direction = self.current_direction
+    
+    def set_spots(self, spot_num1, spot_num2):
+        self.start_spot = spot_num1
+        self.goal_spot = spot_num2
+
 
     def can_move_to_cell(self, pos):
         """

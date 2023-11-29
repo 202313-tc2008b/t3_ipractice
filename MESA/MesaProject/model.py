@@ -22,8 +22,11 @@ class StreetView(mesa.Model):
     ):
         super().__init__()
         self.active_cars = 0
-        self.max_cars = 40
+        self.max_cars = 16
+        initial_cars_num = 8
+        # For control
         self.finished_cars = 0
+        self.car_limit = 50
         
         def read_matrix(filename):
             nmat = []
@@ -196,10 +199,7 @@ class StreetView(mesa.Model):
             self.schedule.add(go)
 
 
-        
-        NUMBER_OF_CARS = 5
-
-        self.make_cars(NUMBER_OF_CARS)        
+        self.make_cars(initial_cars_num)        
 
         self.running = True
         self.datacollector.collect(self)
@@ -208,7 +208,7 @@ class StreetView(mesa.Model):
         # Store available parking spots
         self.available_spots = list(self.parkingSpots_positions)
         # Create cars with random parking spot as initial position and set a different parking spot as the goal
-        for i in range(cars_num):  # Replace NUMBER_OF_CARS with your desired number of cars
+        for i in range(cars_num):  # Replace initial_cars_num with your desired number of cars
             # Get a random parking spot as the initial position for the car
             initial_spot = random.choice(self.available_spots)
             x, y, spot_num1 = initial_spot
@@ -236,7 +236,7 @@ class StreetView(mesa.Model):
     def check_available_spots(self):
         # Check for available spots and spawn cars
         if self.active_cars < self.max_cars and len(self.available_spots) >= 2:
-            if self.finished_cars < 500:
+            if self.finished_cars < self.car_limit:
                 self.make_cars(1)
                 print(self.finished_cars)
         
@@ -283,9 +283,8 @@ class StreetView(mesa.Model):
                             del a
                         except Exception as e:
                             print(f"An error occurred: {e}")
-
-
             self.check_available_spots()
+
         except Exception as e:  # Catch specific exceptions here or use Exception for a general catch
             print(f"An error occurred: {e}")
             
